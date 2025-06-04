@@ -6,7 +6,7 @@ import pandas as pd
 import os
 from collections import Counter
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import accuracy_score, classification_report
+from sklearn.metrics import accuracy_score, classification_report, roc_auc_score
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -14,7 +14,7 @@ from sklearn.neighbors import KNeighborsClassifier
 from sklearn.naive_bayes import GaussianNB
 from sklearn.svm import SVC
 from sklearn.neural_network import MLPClassifier
-from sklearn.preprocessing import LabelEncoder
+from sklearn.preprocessing import LabelEncoder, label_binarize
 
 from features.dim_reduce import extract_features, dimensionality_reduction
 
@@ -73,6 +73,7 @@ def train_and_evaluate_classifier(X, y, train_size, method, n_components, classi
     X_filtered, y_filtered = filter_small_classes(X, y, min_count=2)    # 过滤掉样本数小于2的类别
     X_train, X_test, y_train, y_test = train_test_split(X_filtered, y_filtered,
                                                         train_size=train_size, stratify=y_filtered)
+    classes_in_test = np.unique(y_test)
 
     if classifier_type == 'cnn':
         le = LabelEncoder()
@@ -110,6 +111,19 @@ def train_and_evaluate_classifier(X, y, train_size, method, n_components, classi
                 f.write(f'{classifier_type.upper()} Test Accuracy: {accuracy:.4f}\n')
                 f.write(classification_report(y_test_tensor.cpu(), predicted.cpu(), zero_division=0))
 
+            probs = torch.softmax(test_outputs, dim=1).cpu().numpy()
+            num_classes = probs.shape[1]
+            y_test_np = y_test_tensor.cpu().numpy()
+            y_test_bin = label_binarize(y_test_np, classes=np.arange(num_classes))
+            valid_cols = y_test_bin.sum(axis=0) > 0
+            if valid_cols.sum() < 2:
+                auc = float('nan')  # 无法计算多类AUC
+            else:
+                auc = roc_auc_score(y_test_bin[:, valid_cols], probs[:, valid_cols],
+                                    average='macro', multi_class='ovr')
+            with open(report_file, 'a') as f:
+                f.write(f"AUC (macro): {auc:.4f}\n")
+
     else:
         # Fit the model
         model.fit(X_train, y_train)
@@ -125,6 +139,17 @@ def train_and_evaluate_classifier(X, y, train_size, method, n_components, classi
             f.write(f'{classifier_type.upper()} Test Accuracy: {accuracy:.4f}\n')
             f.write(classification_report(y_test, y_pred, zero_division=0))
 
+        # 多类 AUC
+        y_test_binarized = label_binarize(y_test, classes=classes_in_test)
+        y_pred_proba = model.predict_proba(X_test) if hasattr(model, "predict_proba") else None
+        y_pred_proba = y_pred_proba[:, np.isin(np.unique(y_filtered), classes_in_test)] if y_pred_proba is not None else None
+        if y_pred_proba is not None:
+            auc = roc_auc_score(y_test_binarized, y_pred_proba, average='macro', multi_class='ovr')
+        else:
+            auc = -1  # SVM without probability=True 不支持
+        with open(report_file, 'a') as f:
+            f.write(f"AUC (macro): {auc:.4f}\n")
+
     return accuracy
 
 
@@ -136,8 +161,8 @@ if __name__ == "__main__":
     labels = df['label_id'].values
     print("标签维度:", labels.shape)
 
-    dim_reduce_method = 'Autoencoder'  # 可以选择 'PCA', 'LDA', 'Autoencoder'
-    n_components = 128  # LDA 降维后最多 14 维， PCA 降维后最多 259 维， Autoencoder 可以选择 128
+    dim_reduce_method = 'LDA'  # 可以选择 'PCA', 'LDA', 'Autoencoder'
+    n_components = 14  # LDA 降维后最多 14 维， PCA 降维后最多 259 维， Autoencoder 可以选择 128
 
     features_train = dimensionality_reduction(features, labels=labels, method=dim_reduce_method,
                                               n_components=n_components)
