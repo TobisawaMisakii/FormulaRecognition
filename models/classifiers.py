@@ -111,18 +111,28 @@ def train_and_evaluate_classifier(X, y, train_size, method, n_components, classi
                 f.write(f'{classifier_type.upper()} Test Accuracy: {accuracy:.4f}\n')
                 f.write(classification_report(y_test_tensor.cpu(), predicted.cpu(), zero_division=0))
 
+            # CNN 输出 softmax 概率
             probs = torch.softmax(test_outputs, dim=1).cpu().numpy()
             num_classes = probs.shape[1]
             y_test_np = y_test_tensor.cpu().numpy()
+
             y_test_bin = label_binarize(y_test_np, classes=np.arange(num_classes))
             valid_cols = y_test_bin.sum(axis=0) > 0
-            if valid_cols.sum() < 2:
-                auc = float('nan')  # 无法计算多类AUC
-            else:
-                auc = roc_auc_score(y_test_bin[:, valid_cols], probs[:, valid_cols],
-                                    average='macro', multi_class='ovr')
+
             with open(report_file, 'a') as f:
-                f.write(f"AUC (macro): {auc:.4f}\n")
+                if valid_cols.sum() < 2:
+                    f.write("AUC 无法计算（测试集中可用类别不足）\n")
+                else:
+                    macro_auc = roc_auc_score(y_test_bin[:, valid_cols], probs[:, valid_cols],
+                                              average='macro', multi_class='ovr')
+                    weighted_auc = roc_auc_score(y_test_bin[:, valid_cols], probs[:, valid_cols],
+                                                 average='weighted', multi_class='ovr')
+                    per_class_auc = roc_auc_score(y_test_bin[:, valid_cols], probs[:, valid_cols],
+                                                  average=None, multi_class='ovr')
+
+                    f.write(f"AUC (macro): {macro_auc:.4f}\n")
+                    f.write(f"AUC (weighted): {weighted_auc:.4f}\n")
+                    f.write(f"AUC (per-class): {np.round(per_class_auc, 4).tolist()}\n")
 
     else:
         # Fit the model
@@ -134,21 +144,34 @@ def train_and_evaluate_classifier(X, y, train_size, method, n_components, classi
         # Evaluate the model
         accuracy = accuracy_score(y_test, y_pred)
         print(f'{classifier_type.upper()} Test Accuracy: {accuracy:.4f}')
-        print(classification_report(y_test, y_pred, zero_division=0))
+        # print(classification_report(y_test, y_pred, zero_division=0))
         with open(report_file, 'a') as f:
             f.write(f'{classifier_type.upper()} Test Accuracy: {accuracy:.4f}\n')
             f.write(classification_report(y_test, y_pred, zero_division=0))
 
         # 多类 AUC
-        y_test_binarized = label_binarize(y_test, classes=classes_in_test)
+        y_test_binarized = label_binarize(y_test, classes=np.unique(y_filtered))
         y_pred_proba = model.predict_proba(X_test) if hasattr(model, "predict_proba") else None
-        y_pred_proba = y_pred_proba[:, np.isin(np.unique(y_filtered), classes_in_test)] if y_pred_proba is not None else None
+
         if y_pred_proba is not None:
-            auc = roc_auc_score(y_test_binarized, y_pred_proba, average='macro', multi_class='ovr')
+            valid_cols = y_test_binarized.sum(axis=0) > 0
+            with open(report_file, 'a') as f:
+                if valid_cols.sum() < 2:
+                    f.write("AUC 无法计算（测试集中可用类别不足）\n")
+                else:
+                    macro_auc = roc_auc_score(y_test_binarized[:, valid_cols], y_pred_proba[:, valid_cols],
+                                              average='macro', multi_class='ovr')
+                    weighted_auc = roc_auc_score(y_test_binarized[:, valid_cols], y_pred_proba[:, valid_cols],
+                                                 average='weighted', multi_class='ovr')
+                    per_class_auc = roc_auc_score(y_test_binarized[:, valid_cols], y_pred_proba[:, valid_cols],
+                                                  average=None, multi_class='ovr')
+
+                    f.write(f"AUC (macro): {macro_auc:.4f}\n")
+                    f.write(f"AUC (weighted): {weighted_auc:.4f}\n")
+                    f.write(f"AUC (per-class): {np.round(per_class_auc, 4).tolist()}\n")
         else:
-            auc = -1  # SVM without probability=True 不支持
-        with open(report_file, 'a') as f:
-            f.write(f"AUC (macro): {auc:.4f}\n")
+            with open(report_file, 'a') as f:
+                f.write("AUC: -1 (不支持概率预测的分类器)\n")
 
     return accuracy
 
@@ -182,4 +205,4 @@ if __name__ == "__main__":
                                                  train_size=train_size, classifier_type=clf_name,
                                                  method=dim_reduce_method,
                                                  n_components=n_components, **clf_params)
-        print(f"{clf_name.upper()} Classifier Accuracy: {accuracy:.4f}\n")
+        # print(f"{clf_name.upper()} Classifier Accuracy: {accuracy:.4f}\n")
