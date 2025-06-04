@@ -83,7 +83,7 @@ def extract_features(df, data_root, batch_size=8, device="cuda" if torch.cuda.is
     return features
 
 def dimensionality_reduction(features, labels=None, method='PCA', n_components=2):
-    # 特征降维，可以选择降到 2/3维（可视化散点图） / 1024维度（用于训练）
+    # 特征降维，可以选择降到 2/3维（可视化散点图）
     # 这里可以使用 PCA / LDA / Autoencoder 等方法进行降维
     if method == 'PCA':
         from sklearn.decomposition import PCA
@@ -117,11 +117,11 @@ if __name__ == "__main__":
     # reduced_features = dimensionality_reduction(features, method='Autoencoder', n_components=2)
     # visualize_2d_scatter(reduced_features, reduce_method='Autoencoder', labels=df['label_id'].values, title="Autoencoder 2D Scatter Plot")
 
-    reduced_features = dimensionality_reduction(features, method='PCA', n_components=3)
-    visualize_3d_interactive(reduced_features, reduce_method='PCA', labels=df['label_id'].values, title="PCA 3D Interactive Plot")
+    # reduced_features = dimensionality_reduction(features, method='PCA', n_components=3)
+    # visualize_3d_interactive(reduced_features, reduce_method='PCA', labels=df['label_id'].values, title="PCA 3D Interactive Plot")
 
-    reduced_features = dimensionality_reduction(features, labels=labels, method='LDA', n_components=3)
-    visualize_3d_interactive(reduced_features, reduce_method='LDA', labels=df['label_id'].values, title="LDA 3D Interactive Plot")
+    # reduced_features = dimensionality_reduction(features, labels=labels, method='LDA', n_components=3)
+    # visualize_3d_interactive(reduced_features, reduce_method='LDA', labels=df['label_id'].values, title="LDA 3D Interactive Plot")
 
-    reduced_features = dimensionality_reduction(features, method='Autoencoder', n_components=3)
-    visualize_3d_interactive(reduced_features, reduce_method='Autoencoder', labels=df['label_id'].values, title="Autoencoder 3D Interactive Plot")
+    # reduced_features = dimensionality_reduction(features, method='Autoencoder', n_components=3)
+    # visualize_3d_interactive(reduced_features, reduce_method='Autoencoder', labels=df['label_id'].values, title="Autoencoder 3D Interactive Plot")
