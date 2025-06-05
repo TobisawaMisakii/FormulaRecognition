@@ -176,7 +176,32 @@ def train_and_evaluate_classifier(X, y, train_size, method, n_components, classi
     return accuracy
 
 
-if __name__ == "__main__":
+def evaluate_stability(X, y, method, n_components, classifier_type,
+                       train_sizes, metric='accuracy', **kwargs):
+    """
+    多次训练并评估模型稳定性（准确率或AUC波动）
+    :return: mean, std
+    """
+    scores = []
+    for train_size in train_sizes:
+        print(f"Evaluating {classifier_type.upper()} with train/test size "
+              f"{train_size:.2f}/{1.0-train_size:.2f} on {method} {n_components}D features...")
+        score = train_and_evaluate_classifier(X, y, train_size=train_size,
+                                              method=method, n_components=n_components,
+                                              classifier_type=classifier_type, **kwargs)
+        scores.append(score)
+
+    scores = np.array(scores)
+    print(f"[{classifier_type.upper()} on {method} {n_components}D]: "
+          f"Mean {metric}: {scores.mean():.4f} | Std: {scores.std():.4f}")
+    return scores
+
+
+def main_accuracy():
+    """
+    主函数1：加载数据，提取特征，降维，训练和评估分类器
+    :return:
+    """
     data_root = "../data/processed"
     df = pd.read_csv(os.path.join(data_root, "metadata.csv"))
 
@@ -195,7 +220,7 @@ if __name__ == "__main__":
         'knn': {'n_neighbors': 5},
         'naive_bayes': {},
         'svm': {'kernel': 'linear', 'C': 1.0},
-        'mlp': {'hidden_layer_sizes': (100,), 'max_iter': 300, 'random_state': 42},
+        'mlp': {'hidden_layer_sizes': (100,), 'max_iter': 800, 'random_state': 42},
         'cnn': {'epochs': 100, 'lr': 0.001}
     }
     train_size = 0.8  # 80% training data
@@ -205,4 +230,78 @@ if __name__ == "__main__":
                                                  train_size=train_size, classifier_type=clf_name,
                                                  method=dim_reduce_method,
                                                  n_components=n_components, **clf_params)
-        # print(f"{clf_name.upper()} Classifier Accuracy: {accuracy:.4f}\n")
+
+
+def main_stability():
+    """
+    主函数2：加载数据，提取特征，降维，评估分类器稳定性
+    :return:
+    """
+    data_root = "../data/processed"
+    df = pd.read_csv(os.path.join(data_root, "metadata.csv"))
+
+    features = extract_features(df, data_root)
+    labels = df['label_id'].values
+    print("标签维度:", labels.shape)
+
+    settings = [
+        {'method': 'PCA', 'n_components': 64},
+        {'method': 'LDA', 'n_components': 14},
+        {'method': 'Autoencoder', 'n_components': 128}
+    ]
+
+    classifiers = {
+        'knn': {'n_neighbors': 5},
+        'naive_bayes': {},
+        'svm': {'kernel': 'linear', 'C': 1.0},
+        'mlp': {'hidden_layer_sizes': (100,), 'max_iter': 800, 'random_state': 42},
+        'cnn': {'epochs': 100, 'lr': 0.001}
+    }
+
+    train_sizes = np.linspace(0.4, 0.8, 5)  # 从 40% 到 80% 的训练集大小
+
+    for setting in settings:
+        dim_reduce_method = setting['method']
+        n_components = setting['n_components']
+
+        print(f"\nRunning setting: {dim_reduce_method}_{n_components}d")
+
+        features_train = dimensionality_reduction(features, labels=labels,
+                                                  method=dim_reduce_method,
+                                                  n_components=n_components)
+
+        for clf_name, clf_params in classifiers.items():
+            print(f"  Evaluating stability of {clf_name.upper()}...")
+            scores = evaluate_stability(X=features_train, y=labels,
+                                        method=dim_reduce_method,
+                                        n_components=n_components,
+                                        classifier_type=clf_name,
+                                        train_sizes=train_sizes,
+                                        **clf_params)
+
+            # Save results
+            result_dir = f'cls_report/{clf_name}'
+            os.makedirs(result_dir, exist_ok=True)
+            stability_file = os.path.join(result_dir, f'{dim_reduce_method}_{n_components}d_stability.csv')
+
+            if os.path.exists(stability_file):
+                os.remove(stability_file)
+
+            train_sizes_str = [f"{size:.2f}" for size in train_sizes]
+            stability_df = pd.DataFrame({
+                'train_size': train_sizes_str,
+                'accuracy': scores
+            })
+            mean_acc = np.mean(scores)
+            std_acc = np.std(scores)
+            summary_row = pd.DataFrame([{
+                'train_size': 'mean±std',
+                'accuracy': f'{mean_acc:.4f}±{std_acc:.4f}'
+            }])
+            stability_df = pd.concat([stability_df, summary_row], ignore_index=True)
+            stability_df.to_csv(stability_file, index=False)
+
+
+if __name__ == "__main__":
+    # main_accuracy()  # 训练和评估分类器
+    main_stability()  # 评估分类器稳定性
