@@ -2,6 +2,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import plotly.express as px
 import pandas as pd
+import os
 
 
 def visualize_2d_scatter(features_2d, reduce_method, labels, title="2D Feature Scatter Plot"):
@@ -44,3 +45,27 @@ def visualize_3d_interactive(features, reduce_method, labels, title="Interactive
     fig.update_layout(legend_title_text='Class Label')
     # fig.show()
     fig.write_html(f"/home/cpy/prml-cls/HandWritten-MathFormula-Recognition/figures/{reduce_method}_3d.html")
+
+
+def plot_train_size_vs_accuracy(csv_path, title=None, save_path=None):
+    """
+    读取稳定性csv（包含train_size和accuracy列），画出train_size与accuracy的折线图
+    """
+    df = pd.read_csv(csv_path)
+
+    # 过滤掉最后一行 mean±std
+    df_numeric = df[pd.to_numeric(df['train_size'], errors='coerce').notnull()].copy()
+    df_numeric['train_size'] = df_numeric['train_size'].astype(float)
+    df_numeric['accuracy'] = df_numeric['accuracy'].astype(float)
+
+    plt.figure(figsize=(8, 6))
+    plt.plot(df_numeric['train_size'], df_numeric['accuracy'], marker='o', linestyle='-')
+    plt.title(title or "Train Size vs Accuracy")
+    plt.xlabel("Train Size")
+    plt.ylabel("Accuracy")
+    plt.grid(True)
+
+    if save_path:
+        plt.savefig(save_path)
+    else:
+        plt.show()

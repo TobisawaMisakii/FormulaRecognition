@@ -17,7 +17,7 @@ from sklearn.neural_network import MLPClassifier
 from sklearn.preprocessing import LabelEncoder, label_binarize
 
 from features.dim_reduce import extract_features, dimensionality_reduction
-
+from utils.visualization import plot_train_size_vs_accuracy
 
 class SimpleCNN(nn.Module):
     def __init__(self, input_dim, num_classes):
@@ -258,7 +258,7 @@ def main_stability():
         'cnn': {'epochs': 100, 'lr': 0.001}
     }
 
-    train_sizes = np.linspace(0.4, 0.8, 5)  # 从 40% 到 80% 的训练集大小
+    train_sizes = np.linspace(0.35, 0.85, 30)  # 训练集大小
 
     for setting in settings:
         dim_reduce_method = setting['method']
@@ -300,6 +300,11 @@ def main_stability():
             }])
             stability_df = pd.concat([stability_df, summary_row], ignore_index=True)
             stability_df.to_csv(stability_file, index=False)
+
+            plot_path = os.path.join(result_dir, f"{dim_reduce_method}_{n_components}d_stability.png")
+            plot_train_size_vs_accuracy(csv_path=stability_file,
+                                        title=f"{clf_name.upper()} - {dim_reduce_method} {n_components}D",
+                                        save_path=plot_path)
 
 
 if __name__ == "__main__":
