@@ -17,7 +17,7 @@ from sklearn.neural_network import MLPClassifier
 from sklearn.preprocessing import LabelEncoder, label_binarize
 
 from features.dim_reduce import extract_features, dimensionality_reduction
-from utils.visualization import plot_train_size_vs_accuracy
+from utils.visualization import plot_train_size_vs_accuracy, plot_handwritten_vs_printed_accuracy
 
 class SimpleCNN(nn.Module):
     def __init__(self, input_dim, num_classes):
@@ -307,6 +307,92 @@ def main_stability():
                                         save_path=plot_path)
 
 
+def main_handwritten_impact():
+    data_root = "../data/processed"
+    df = pd.read_csv(os.path.join(data_root, "metadata.csv"))
+    df_handwritten = df[df['is_handwritten'] == True].reset_index(drop=True)
+    df_printed = df[df['is_handwritten'] == False].reset_index(drop=True)
+
+    # 特征提取
+    X_hand, y_hand = extract_features(df_handwritten)
+    X_print, y_print = extract_features(df_printed)
+
+    # 降维配置
+    dim_reduce_method = 'LDA'  # 'PCA', 'LDA', 'Autoencoder'
+    n_components = 8
+
+    # 分类器设置
+    classifiers = {
+        'knn': {'n_neighbors': 5},
+        'naive_bayes': {},
+        'svm': {'kernel': 'linear', 'C': 1.0},
+        'mlp': {'hidden_layer_sizes': (100,), 'max_iter': 800, 'random_state': 42},
+        'cnn': {'epochs': 100, 'lr': 0.001}
+    }
+
+    train_sizes = np.linspace(0.35, 0.85, 30)
+
+    # 对每个分类器进行手写 vs 打印的对比
+    for clf_name, clf_params in classifiers.items():
+        print(f"\nEvaluating classifier: {clf_name.upper()}")
+
+        # 降维（分别处理）
+        X_hand_reduced = dimensionality_reduction(X_hand, labels=y_hand,
+                                                  method=dim_reduce_method,
+                                                  n_components=n_components)
+        X_print_reduced = dimensionality_reduction(X_print, labels=y_print,
+                                                   method=dim_reduce_method,
+                                                   n_components=n_components)
+
+        print("  Evaluating on handwritten samples...")
+        scores_hand = evaluate_stability(X=X_hand_reduced, y=df_handwritten['label_id'],
+                                         method=dim_reduce_method,
+                                         n_components=n_components,
+                                         classifier_type=clf_name,
+                                         train_sizes=train_sizes, **clf_params)
+
+        print("  Evaluating on printed samples...")
+        scores_print = evaluate_stability(X=X_print_reduced, y=df_printed['label_id'],
+                                          method=dim_reduce_method,
+                                          n_components=n_components,
+                                          classifier_type=clf_name,
+                                          train_sizes=train_sizes, **clf_params)
+
+        # 保存 CSV 结果
+        result_dir = f'cls_report/{clf_name}'
+        os.makedirs(result_dir, exist_ok=True)
+        stability_file = os.path.join(result_dir, f'{dim_reduce_method}_{n_components}d_handwritten_impact.csv')
+        if os.path.exists(stability_file):
+            os.remove(stability_file)
+
+        train_sizes_str = [f"{size:.2f}" for size in train_sizes]
+        stability_df = pd.DataFrame({
+            'train_size': train_sizes_str,
+            'handwritten_accuracy': scores_hand,
+            'printed_accuracy': scores_print
+        })
+
+        # 添加平均±方差
+        mean_hand = np.mean(scores_hand)
+        std_hand = np.std(scores_hand)
+        mean_print = np.mean(scores_print)
+        std_print = np.std(scores_print)
+        summary_row = pd.DataFrame([{
+            'train_size': 'mean±std',
+            'handwritten_accuracy': f'{mean_hand:.4f}±{std_hand:.4f}',
+            'printed_accuracy': f'{mean_print:.4f}±{std_print:.4f}'
+        }])
+        stability_df = pd.concat([stability_df, summary_row], ignore_index=True)
+        stability_df.to_csv(stability_file, index=False)
+
+        # 画图
+        plot_path = os.path.join(result_dir, f'{dim_reduce_method}_{n_components}d_handwritten_impact.png')
+        plot_handwritten_vs_printed_accuracy(csv_path=stability_file,
+                                             title=f"{clf_name.upper()} - {dim_reduce_method} {n_components}D",
+                                             save_path=plot_path)
+
+
 if __name__ == "__main__":
     # main_accuracy()  # 训练和评估分类器
-    main_stability()  # 评估分类器稳定性
+    # main_stability()  # 评估分类器稳定性
+    main_handwritten_impact()  # 手写和印刷体的影响

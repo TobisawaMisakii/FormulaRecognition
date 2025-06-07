@@ -1,0 +1,16 @@
+NAIVE_BAYES Test Accuracy: 0.7143
+              precision    recall  f1-score   support
+
+           1       0.00      0.00      0.00         1
+           3       0.00      0.00      0.00         1
+           5       0.00      0.00      0.00         1
+          11       0.62      1.00      0.77         5
+          12       0.83      1.00      0.91         5
+          13       0.00      0.00      0.00         1
+
+    accuracy                           0.71        14
+   macro avg       0.24      0.33      0.28        14
+weighted avg       0.52      0.71      0.60        14
+AUC (macro): 0.7744
+AUC (weighted): 0.8462
+AUC (per-class): [0.6154, 0.9231, 1.0, 0.8, 1.0, 0.3077]

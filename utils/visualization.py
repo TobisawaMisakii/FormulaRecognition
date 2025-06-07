@@ -69,3 +69,37 @@ def plot_train_size_vs_accuracy(csv_path, title=None, save_path=None):
         plt.savefig(save_path)
     else:
         plt.show()
+
+
+def plot_handwritten_vs_printed_accuracy(csv_path, title=None, save_path=None):
+    """
+    在同一张图中绘制手写与打印公式的准确率对比曲线
+    :param csv_path: CSV 文件路径，包含 train_size, handwritten_accuracy, printed_accuracy 列
+    :param title: 图标题（可选）
+    :param save_path: 是否保存图像（路径），为空则直接 plt.show()
+    """
+    df = pd.read_csv(csv_path)
+
+    # 只保留数值行（排除 'mean±std'）
+    df_numeric = df[pd.to_numeric(df['train_size'], errors='coerce').notnull()].copy()
+    df_numeric['train_size'] = df_numeric['train_size'].astype(float)
+    df_numeric['handwritten_accuracy'] = df_numeric['handwritten_accuracy'].astype(float)
+    df_numeric['printed_accuracy'] = df_numeric['printed_accuracy'].astype(float)
+
+    plt.figure(figsize=(8, 6))
+    plt.plot(df_numeric['train_size'], df_numeric['handwritten_accuracy'],
+             label='Handwritten', marker='o', linestyle='-')
+    plt.plot(df_numeric['train_size'], df_numeric['printed_accuracy'],
+             label='Printed', marker='s', linestyle='--')
+
+    plt.xlabel('Train Size')
+    plt.ylabel('Accuracy')
+    plt.title(title or 'Handwritten vs Printed Accuracy')
+    plt.legend()
+    plt.grid(True)
+
+    if save_path:
+        plt.savefig(save_path, bbox_inches='tight')
+        print(f"Saved comparison plot to {save_path}")
+    else:
+        plt.show()

@@ -1,0 +1,16 @@
+KNN Test Accuracy: 0.7857
+              precision    recall  f1-score   support
+
+           1       0.00      0.00      0.00         1
+           3       0.00      0.00      0.00         1
+           5       1.00      1.00      1.00         1
+          11       0.83      1.00      0.91         5
+          12       0.71      1.00      0.83         5
+          13       0.00      0.00      0.00         1
+
+    accuracy                           0.79        14
+   macro avg       0.42      0.50      0.46        14
+weighted avg       0.62      0.79      0.69        14
+AUC (macro): 0.8974
+AUC (weighted): 0.9560
+AUC (per-class): [0.9231, 0.9615, 1.0, 1.0, 1.0, 0.5]
