@@ -14,6 +14,16 @@ from features.dim_reduce import extract_features
 from features.dim_reduce import dimensionality_reduction
 
 
+def save_results(method, acc, nmi):
+    dir_path = os.path.join("cluster_report", method)
+    os.makedirs(dir_path, exist_ok=True)
+    result_path = os.path.join(dir_path, "result.txt")
+    with open(result_path, "w") as f:
+        f.write(f"ACC: {acc:.4f}\n")
+        f.write(f"NMI: {nmi:.4f}\n")
+    print(f"Saved clustering results to {result_path}")
+
+
 def cluster_accuracy(y_true, y_pred):
     """
     使用 Hungarian 算法对齐标签计算聚类准确率（ACC）
@@ -32,10 +42,10 @@ def cluster_accuracy(y_true, y_pred):
 
 
 def run_clustering(X, y_true, method="kmeans", n_clusters=15):
-    print("X shape:", X.shape)
-    print("X min:", X.min(axis=0))
-    print("X max:", X.max(axis=0))
-    print("X mean:", X.mean(axis=0))
+    # print("X shape:", X.shape)
+    # print("X min:", X.min(axis=0))
+    # print("X max:", X.max(axis=0))
+    # print("X mean:", X.mean(axis=0))
     if method == "kmeans":
         model = KMeans(n_clusters=n_clusters, random_state=42)
     elif method == "dbscan":
@@ -50,9 +60,9 @@ def run_clustering(X, y_true, method="kmeans", n_clusters=15):
     # 对于 DBSCAN 的 -1 噪声点，过滤掉
     mask = y_pred != -1 if method == "dbscan" else np.ones(len(y_pred), dtype=bool)
 
-    print("mask sum:", mask.sum())
-    print("y_true[mask] shape:", np.array(y_true)[mask].shape)
-    print("y_pred[mask] shape:", y_pred[mask].shape)
+    # print("mask sum:", mask.sum())
+    # print("y_true[mask] shape:", np.array(y_true)[mask].shape)
+    # print("y_pred[mask] shape:", y_pred[mask].shape)
 
     acc = cluster_accuracy(np.array(y_true)[mask], y_pred[mask])
     nmi = normalized_mutual_info_score(np.array(y_true)[mask], y_pred[mask])
@@ -67,7 +77,7 @@ def analyze_cluster_composition(y_pred, y_true, label_map):
     for pred, true in zip(y_pred, y_true):
         if pred != -1:
             clusters[pred].append(label_map[true])
-    print("\n📊 聚类簇组成分析：")
+    print("\n 聚类簇组成分析：")
     for cid, members in sorted(clusters.items()):
         top = Counter(members).most_common(3)
         print(f"Cluster {cid}: {top}")
@@ -79,9 +89,10 @@ def plot_tsne(X, y, title="t-SNE cluster visualization", save_path=None):
     plt.scatter(X_tsne[:, 0], X_tsne[:, 1], c=y, cmap="tab10", s=10)
     plt.title(title)
     if save_path:
-        save_path = os.path.join("cluster_report", save_path)
-        plt.savefig(save_path, bbox_inches='tight')
-        print(f"Saved t-SNE figure to {save_path}")
+        full_path = os.path.join("cluster_report", save_path)
+        os.makedirs(os.path.dirname(full_path), exist_ok=True)
+        plt.savefig(full_path, bbox_inches='tight')
+        print(f"Saved t-SNE figure to {full_path}")
     else:
         plt.show()
 
@@ -118,6 +129,8 @@ def main_clustering():
         print(f"\n=== Running Clustering: {method.upper()} ===")
         y_pred, acc, nmi = run_clustering(X_reduced, labels, method=method, n_clusters=5)
         print(f"[{method.upper()}] ACC: {acc:.4f} | NMI: {nmi:.4f}")
+
+        save_results(method, acc, nmi)
 
         analyze_cluster_composition(y_pred, labels, formula_map)
         plot_tsne(X_reduced, y_pred, title=f"t-SNE cluster result ({method})",

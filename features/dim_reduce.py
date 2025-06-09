@@ -64,23 +64,30 @@ def reduce_with_autoencoder(features, n_components=2, epochs=100, batch_size=64,
         reduced = model.encode(features.to(device)).cpu().numpy()
     return reduced
 
-def extract_features(df, data_root, batch_size=8, device="cuda" if torch.cuda.is_available() else "cpu"):
-    data_root = "../data/processed"
-    df = pd.read_csv(os.path.join(data_root, "metadata.csv"))
-    batch_size = 8
 
+def extract_features(df, data_root="../data/processed", batch_size=8, device="cuda" if torch.cuda.is_available() else "cpu"):
+    """
+    从传入的 df 中提取图像和文本特征，并返回对齐后的特征和标签。
+    """
+    # 提取特征
     img_features = extract_image_features_from_npy(df, data_root, batch_size)
     img_features = torch.tensor(img_features, dtype=torch.float32).to(device)
     print("图像特征维度:", img_features.shape)
+
     bert_features = extract_bert_features(df, batch_size)
     bert_features = torch.tensor(bert_features, dtype=torch.float32).to(device)
     print("BERT特征维度:", bert_features.shape)
 
-    # 合并特征，文本在前，图像在后
+    # 对齐并合并特征
+    if bert_features.shape[0] != img_features.shape[0]:
+        raise ValueError(f"BERT 和图像特征样本数量不一致：{bert_features.shape[0]} vs {img_features.shape[0]}")
+
     features = torch.cat((bert_features, img_features), dim=1)
     print("合并特征维度:", features.shape)
 
-    return features
+    labels = df['label_id'].values[:features.shape[0]]  # 确保标签长度一致
+
+    return features, labels
 
 def dimensionality_reduction(features, labels=None, method='PCA', n_components=2):
     # 特征降维，可以选择降到 2/3维（可视化散点图）

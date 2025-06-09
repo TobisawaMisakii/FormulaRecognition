@@ -1,3 +1,4 @@
+# image_features.py
 # extract_image_features_from_npy.py
 
 import os
